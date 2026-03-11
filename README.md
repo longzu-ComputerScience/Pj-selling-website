@@ -263,6 +263,29 @@ approximation because:
 
 ---
 
+## Deploying to Vercel (Frontend)
+
+### Option A: Set Root Directory (Recommended)
+
+1. Push code to GitHub
+2. Import the repo in [Vercel](https://vercel.com/new)
+3. In **Project Settings → General → Root Directory**, set to `frontend`
+4. Add environment variable `NEXT_PUBLIC_API_URL` = your backend URL (e.g. `https://your-backend.railway.app/api`)
+5. Deploy
+
+### Option B: Deploy from repo root
+
+The `vercel.json` at the repo root is configured to build from the `frontend/` subdirectory. If Option A is not used:
+
+1. Import the repo in Vercel (leave Root Directory as default)
+2. Vercel will use `vercel.json` settings automatically
+3. Add `NEXT_PUBLIC_API_URL` in **Settings → Environment Variables**
+4. Deploy
+
+> **Note:** The backend (FastAPI) must be deployed separately (e.g., Railway, Render, Fly.io). Without a running backend, the frontend will display an error message with a Retry button. Set the `ALLOWED_ORIGIN` env var on the backend to your Vercel domain for CORS.
+
+---
+
 ## Limitations
 
 - No product images available — UI uses emoji placeholders.
