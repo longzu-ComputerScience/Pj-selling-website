@@ -28,12 +28,12 @@ import time
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
-RAW_ITEMS = ROOT / "items.parquet"
-RAW_TRANSACTIONS = ROOT / "transactions-2025-12.parquet"
+RAW_ITEMS = ROOT / "raw_data" / "items.parquet"
+RAW_TRANSACTIONS = ROOT / "raw_data" / "transactions-2025-12.parquet"
 
 
 def load_raw_data():
-    """Load and clean raw parquet files."""
+    """Load and clean raw parquet files, removing discontinued items."""
     print("Loading raw data...")
     items = pl.read_parquet(RAW_ITEMS)
     transactions = pl.read_parquet(RAW_TRANSACTIONS)
@@ -45,8 +45,18 @@ def load_raw_data():
         pl.col("updated_date").cast(pl.Datetime("us")),
     )
 
-    print(f"  Items: {items.height} rows, {items.width} columns")
-    print(f"  Transactions: {transactions.height} rows, {transactions.width} columns")
+    print(f"  Items (raw): {items.height} rows, {items.width} columns")
+    print(f"  Transactions (raw): {transactions.height} rows, {transactions.width} columns")
+
+    # Filter out discontinued items (sale_status == 0)
+    items = items.filter(pl.col("sale_status") != 0)
+    print(f"  Items after removing discontinued (sale_status=0): {items.height} rows")
+
+    # Remove transactions referencing discontinued items
+    active_item_ids = items["item_id"].unique()
+    transactions = transactions.filter(pl.col("item_id").is_in(active_item_ids))
+    print(f"  Transactions after filtering: {transactions.height} rows")
+
     return items, transactions
 
 
