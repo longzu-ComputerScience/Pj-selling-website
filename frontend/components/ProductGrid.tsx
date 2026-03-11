@@ -9,8 +9,12 @@ interface ProductGridProps {
 export default function ProductGrid({ products, title }: ProductGridProps) {
   if (products.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        No products found.
+      <div className="text-center py-16">
+        <div className="text-5xl mb-4 opacity-50">📦</div>
+        <p className="text-gray-400 text-lg font-medium">No products found</p>
+        <p className="text-gray-300 text-sm mt-1">
+          Try adjusting your search or filters
+        </p>
       </div>
     );
   }
@@ -20,9 +24,15 @@ export default function ProductGrid({ products, title }: ProductGridProps) {
       {title && (
         <h2 className="text-xl font-bold text-gray-800 mb-4">{title}</h2>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {products.map((product) => (
-          <ProductCard key={product.item_id} product={product} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+        {products.map((product, idx) => (
+          <div
+            key={product.item_id}
+            className="animate-card-in"
+            style={{ animationDelay: `${idx * 30}ms` }}
+          >
+            <ProductCard product={product} />
+          </div>
         ))}
       </div>
     </div>

@@ -8,6 +8,23 @@ import SearchFilter from "@/components/SearchFilter";
 
 const PAGE_SIZE = 20;
 
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+        <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
+          <div className="skeleton rounded-lg h-36 mb-3" />
+          <div className="skeleton rounded h-3 w-16 mb-2" />
+          <div className="skeleton rounded h-4 w-full mb-1" />
+          <div className="skeleton rounded h-4 w-3/4 mb-2" />
+          <div className="skeleton rounded h-3 w-20 mb-3" />
+          <div className="skeleton rounded h-5 w-24 mt-2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategoriesList] = useState<string[]>([]);
@@ -31,7 +48,11 @@ export default function HomePage() {
       setTotal(data.total);
     } catch (err) {
       console.error("Failed to fetch products:", err);
-      setError("Failed to load products. Make sure the backend is running on port 8000.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load products. Make sure the backend is running on port 8000."
+      );
     } finally {
       setLoading(false);
     }
@@ -47,67 +68,153 @@ export default function HomePage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const handleFilterChange = (newFilters: { search: string; category: string }) => {
+  const handleFilterChange = (newFilters: {
+    search: string;
+    category: string;
+  }) => {
     setFilters(newFilters);
     setPage(1);
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Products</h1>
+    <div className="animate-fade-in-up">
+      {/* Page header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+          Products
+        </h1>
+        <p className="text-gray-400 mt-1 text-sm">
+          Browse our full catalog of products
+        </p>
+      </div>
 
       <SearchFilter
         categories={categories}
         onFilterChange={handleFilterChange}
       />
 
+      {/* Error state */}
       {error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
-          {error}
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center animate-fade-in-up">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-red-700 font-semibold mb-1">
+            Unable to load products
+          </p>
+          <p className="text-red-500 text-sm mb-4 max-w-md mx-auto">
+            {error}
+          </p>
           <button
             onClick={fetchProducts}
-            className="ml-3 underline hover:text-red-800"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-all active:scale-[0.98] shadow-sm"
           >
-            Retry
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Try Again
           </button>
         </div>
       ) : loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-gray-200 rounded-lg h-72 animate-pulse"
-            />
-          ))}
-        </div>
+        <SkeletonGrid />
       ) : (
         <>
-          <p className="text-sm text-gray-500 mb-4">
-            {total.toLocaleString()} products found
-          </p>
+          {/* Results info */}
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-sm text-gray-400">
+              <span className="font-semibold text-gray-600">
+                {total.toLocaleString()}
+              </span>{" "}
+              products found
+            </p>
+            {totalPages > 1 && (
+              <p className="text-sm text-gray-400">
+                Page {page} of {totalPages}
+              </p>
+            )}
+          </div>
+
           <ProductGrid products={products} />
         </>
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-8">
+      {!loading && !error && totalPages > 1 && (
+        <div className="flex justify-center items-center gap-3 mt-10 mb-2">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-50 hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-[0.98]"
           >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
             Previous
           </button>
-          <span className="text-sm text-gray-600">
-            Page {page} of {totalPages}
-          </span>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum: number;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (page <= 3) {
+                pageNum = i + 1;
+              } else if (page >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = page - 2 + i;
+              }
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setPage(pageNum)}
+                  className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
+                    page === pageNum
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-500 hover:bg-gray-100"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-50 hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-[0.98]"
           >
             Next
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
           </button>
         </div>
       )}

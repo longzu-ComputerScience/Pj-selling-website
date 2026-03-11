@@ -14,9 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body className="bg-gray-50 min-h-screen">
+      <body className="bg-gray-50 min-h-screen text-gray-800 antialiased">
         <Header />
-        <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </main>
       </body>
     </html>
   );

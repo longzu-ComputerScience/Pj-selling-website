@@ -9,11 +9,33 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 async function fetchAPI<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} ${res.statusText}`);
+    }
+    return res.json();
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(
+        "Request timed out. The backend may be starting up — please try again."
+      );
+    }
+    if (err instanceof TypeError) {
+      throw new Error(
+        "Cannot connect to the backend. Make sure it is running on port 8000."
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json();
 }
 
 export async function getProducts(

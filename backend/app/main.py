@@ -34,7 +34,8 @@ if _vercel_url:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
-    allow_methods=["GET"],
+    allow_credentials=True,
+    allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
 
