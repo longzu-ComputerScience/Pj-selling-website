@@ -118,15 +118,17 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* ── Section A: Related Products (horizontal scroll) ── */}
+      {/* ── Section A: Solution 1 (Related Products) — mọi sản phẩm ── */}
       <div className="border-t pt-8 mb-10">
         <RelatedProducts itemId={itemId} />
       </div>
 
-      {/* ── Section B: Recommended Products (horizontal scroll) */}
-      <div className="border-t pt-8">
-        <RecommendedProducts itemId={itemId} />
-      </div>
+      {/* ── Section B: Solution 2 (Recommended Products) — chỉ hiển thị cho Tã ── */}
+      {product.category_l1 === "Tã" && (
+        <div className="border-t pt-8">
+          <RecommendedProducts itemId={itemId} />
+        </div>
+      )}
     </div>
   );
 }

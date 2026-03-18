@@ -6,7 +6,7 @@ import { getRecommendations } from "@/lib/api";
 import ProductGrid from "./ProductGrid";
 
 export default function RecommendationList() {
-  const [customerId, setCustomerId] = useState("");
+  const [itemId, setItemId] = useState("");
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [strategy, setStrategy] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,9 +14,9 @@ export default function RecommendationList() {
   const [searched, setSearched] = useState(false);
 
   const handleSearch = async () => {
-    const id = parseInt(customerId, 10);
-    if (isNaN(id)) {
-      setError("Please enter a valid customer ID (number).");
+    const id = itemId.trim();
+    if (!id) {
+      setError("Please enter a valid item ID.");
       return;
     }
 
@@ -42,18 +42,18 @@ export default function RecommendationList() {
       <div className="flex gap-3 mb-6">
         <input
           type="text"
-          placeholder="Enter Customer ID (e.g. 7853616)"
-          value={customerId}
-          onChange={(e) => setCustomerId(e.target.value)}
+          placeholder="Enter Item ID (e.g. 0020010000098)"
+          value={itemId}
+          onChange={(e) => setItemId(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           className="flex-1 max-w-md px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
         />
         <button
           onClick={handleSearch}
-          disabled={loading || !customerId}
+          disabled={loading || !itemId.trim()}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
         >
-          {loading ? "Loading..." : "Get Recommendations"}
+          {loading ? "Loading..." : "Get Solution 2"}
         </button>
       </div>
 
@@ -68,20 +68,14 @@ export default function RecommendationList() {
           {strategy && (
             <div className="mb-4 flex items-center gap-2">
               <span className="text-sm text-gray-500">Strategy:</span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded ${
-                  strategy === "personalized"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-yellow-100 text-yellow-700"
-                }`}
-              >
+              <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">
                 {strategy}
               </span>
             </div>
           )}
           <ProductGrid
             products={recommendations}
-            title={`Recommendations (${recommendations.length} products)`}
+            title={`Solution 2 Recommendations (${recommendations.length} products)`}
           />
         </div>
       )}

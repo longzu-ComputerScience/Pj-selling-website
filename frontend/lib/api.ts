@@ -6,7 +6,7 @@ import {
 } from "./types";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
 async function fetchAPI<T>(path: string): Promise<T> {
   const controller = new AbortController();
@@ -62,11 +62,11 @@ export async function getProduct(itemId: string): Promise<Product> {
 }
 
 export async function getRecommendations(
-  customerId: number,
+  itemId: string,
   n: number = 20
 ): Promise<RecommendationResponse> {
   return fetchAPI<RecommendationResponse>(
-    `/recommendations/${customerId}?n=${n}`
+    `/recommendations/${encodeURIComponent(itemId)}?n=${n}`
   );
 }
 

@@ -47,7 +47,7 @@ export default function RelatedProducts({ itemId }: { itemId: string }) {
   return (
     <HorizontalProductRow
       products={related}
-      title="Related Products"
+      title="Related Products (Solution 1)"
       badge={strategy}
     />
   );

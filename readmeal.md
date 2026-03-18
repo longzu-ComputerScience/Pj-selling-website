@@ -9,12 +9,13 @@
 
 | | Related Products ⭐ | Recommendations |
 |---|---|---|
-| **Input** | `item_id` (SP đang xem) | `customer_id` (cần đăng nhập) |
-| **Khi nào dùng** | Luôn — chỉ cần người dùng click vào 1 SP | Chỉ khi biết khách hàng là ai |
-| **Không cần đăng nhập?** | ✅ Hoạt động tốt | ❌ Rơi vào cold-start (chỉ trả SP phổ biến) |
-| **Thuật toán** | Hybrid: Behavioral + Metadata | Co-occurrence Collaborative Filtering |
+| **Input** | `item_id` (SP đang xem) | `item_id` (SP đang xem) |
+| **Khi nào dùng** | Luôn — mọi sản phẩm đều chạy qua bước này | Chỉ bổ sung khi SP thuộc nhóm `Tã` |
+| **Không cần đăng nhập?** | ✅ Hoạt động tốt | ✅ Hoạt động tốt |
+| **Thuật toán** | Co-buy + lọc category tương tự | Solution 1 + upsale theo `size_rank` |
 
-→ Trong hệ thống không có đăng nhập, **Related Products là thuật toán gợi ý chính**, vì nó tận dụng tín hiệu duy nhất: **sản phẩm người dùng đang quan tâm**.
+→ Trong hệ thống không có đăng nhập, **Solution 1 là tầng gợi ý nền cho mọi sản phẩm**.  
+→ **Solution 2 không thay thế Solution 1** mà chỉ rerank thêm cho nhóm `Tã`.
 
 ---
 
@@ -208,78 +209,84 @@ Sắp xếp giảm dần → Top N sản phẩm
 
 # PHẦN 2: PRODUCT RECOMMENDATIONS (BỔ SUNG)
 
-> Chỉ hoạt động tốt khi có `customer_id`.
-> Trong hệ thống không đăng nhập, phần này chủ yếu để **demo** — người dùng nhập thủ công ID khách hàng.
+> Dùng cùng `item_id` như Related Products.
+> Chỉ áp dụng thêm khi sản phẩm đang xem thuộc nhóm `Tã`.
 
 ---
 
 ## Slide 2.1 — Ý tưởng
 
-**Input:** `customer_id` → tổng hợp lịch sử mua hàng → gợi ý SP mới.
+**Input:** `item_id` của sản phẩm đang xem.
 
 **So sánh với Related Products:**
 
 | | Related Products | Recommendations |
 |---|---|---|
-| Biết người dùng? | ❌ Không | ✅ Có (qua customer_id) |
-| Tín hiệu | SP đang xem | Toàn bộ SP đã mua |
-| Kết quả | Giống nhau cho mọi người xem cùng SP | Khác nhau cho mỗi khách hàng |
+| Input | `item_id` | `item_id` |
+| Tín hiệu | Co-buy + category tương tự | Kết quả Solution 1 + `size_rank` |
+| Kết quả | Top SP liên quan | Top SP liên quan nhưng ưu tiên upsale size |
 
 ---
 
-## Slide 2.2 — Thuật toán cá nhân hóa
+## Slide 2.2 — Thuật toán upsale cho nhóm Tã
 
 ```
-1. Lấy purchased_items = [X₁, X₂, ..., Xₖ] của customer_id
+1. Chạy Solution 1 trước:
+   → lấy tập ứng viên co-buy đã lọc category
 
-2. Với mỗi Xᵢ, tra bảng co-occurrence:
-   → Tìm tất cả SP Y mà co_count(Xᵢ, Y) > 0
+2. Chỉ giữ ứng viên thuộc nhóm Tã và có size_rank
 
-3. Tổng hợp:
-   score(Y) = Σ co_count(Xᵢ, Y)   ∀ Xᵢ ∈ purchased_items
+3. Tính khoảng cách size:
+   size_gap(Y) = size_rank(Y) - size_rank(X)
+   chỉ giữ size_gap >= 0
 
-4. Loại SP đã mua, sắp xếp giảm dần, lấy top N
+4. Tính điểm upsale:
+   score_upsale(Y) = size_gap(Y) + 1
+
+5. Tính điểm cuối:
+   final_score(Y) = co_count(X, Y) * score_upsale(Y)
+
+6. Sắp xếp giảm dần, lấy top N
 ```
 
-**Ý nghĩa:** score(Y) cao = Y hay được mua cùng với **nhiều** SP mà khách đã mua → phù hợp với sở thích tổng thể.
+**Ý nghĩa:** sản phẩm vẫn phải liên quan theo `co_count`, nhưng size lớn hơn sẽ được ưu tiên hơn để phục vụ mục tiêu upsale.
 
 ---
 
-## Slide 2.3 — Cold-Start (Không có lịch sử)
+## Slide 2.3 — Fallback Logic
 
-**Khi `customer_id` không tồn tại hoặc không nhập:**
+**Khi nào không áp dụng được Solution 2?**
 
 ```
-→ Trả về N sản phẩm phổ biến nhất (Popularity Fallback)
+1. Sản phẩm không thuộc nhóm Tã
+2. Không có size_rank
+3. Không có ứng viên Tã phù hợp
+
+→ Khi đó trả về nguyên kết quả của Solution 1
 ```
 
-| item_id | purchase_count |
-|---------|:--------------:|
-| SP042   | 5,230          |
-| SP018   | 4,891          |
-
-→ Đây là lý do khi không có đăng nhập, Recommendations **kém hiệu quả hơn** Related Products.
-Nó chỉ trả về "SP bán chạy" — **không liên quan** đến sở thích hiện tại của người dùng.
+→ Như vậy, **mọi sản phẩm đều có kết quả nền từ Solution 1**, còn Solution 2 chỉ là lớp cộng thêm cho `Tã`.
 
 ---
 
 ## Slide 2.4 — Sơ đồ Luồng Recommendation
 
 ```
-customer_id
+item_id
     │
-    ├── Có lịch sử ──► Co-occurrence ──► Tổng hợp score
-    │                                        │
-    │                               Loại SP đã mua
-    │                                        │
-    │                               Lấy top N
-    │                               (strategy: "personalized")
-    │
-    └── Không có / không nhập
-                │
-                ▼
-        Top N SP phổ biến nhất
-        (strategy: "popular")   ← kém hiệu quả
+    ├── Solution 1:
+    │   co-buy + lọc category
+    │        │
+    │        ├── Không phải Tã ──► trả kết quả Solution 1
+    │        │
+    │        └── Là Tã
+    │             │
+    │             ▼
+    │      Solution 2:
+    │      rerank theo size_rank
+    │             │
+    │             ├── Có ứng viên hợp lệ ──► trả kết quả rerank
+    │             └── Không có ───────────► fallback Solution 1
 ```
 
 ---
@@ -301,13 +308,11 @@ customer_id
 
 **Bước lọc:** Loại bỏ SP ngừng kinh doanh (`sale_status = 0`) + giao dịch liên quan.
 
-**Output:** 4 artifact phục vụ API backend:
+**Output:** 2 artifact phục vụ API backend:
 
 | Artifact | Mô tả | Dùng cho |
 |----------|--------|----------|
-| `products.parquet` | Catalog đã lọc | Hiển thị SP |
-| `item_popularity.parquet` | Lượt mua / SP | Cold-start fallback |
-| `customer_history.parquet` | DS SP đã mua / KH | Recommendation |
+| `products.parquet` | Catalog đã lọc + `raw_size`, `normalized_size`, `size_rank`, `is_diaper` | **Solution 1 + Solution 2** |
 | `item_cooccurrence.parquet` | Đồng xuất hiện item↔item | **Related + Recommendation** |
 
 ---
@@ -325,10 +330,10 @@ customer_id
 ┌──────────────────────────────┐
 │       PREPROCESSING          │
 │  • Lọc SP ngừng kinh doanh   │
+│  • Chuẩn hóa size cho Tã     │
 │  • Tạo pseudo-sessions       │
 │  • Tính co-occurrence        │
-│  • Tính popularity           │
-│  • Tổng hợp lịch sử KH      │
+│  • Lưu products metadata     │
 └───────────┬──────────────────┘
             │
             ▼
@@ -339,14 +344,13 @@ customer_id
     ┌───────┴───────┐
     ▼               ▼
 ┌──────────┐  ┌───────────┐
-│ Related  │  │  Recommend │
-│ Products │  │  Service   │
-│ ⭐ CHÍNH │  │  (bổ sung) │
-│          │  │            │
-│ Hybrid:  │  │ Co-occ +   │
-│ B + M    │  │ Popular    │
-│          │  │            │
-│ Không cần│  │ Cần        │
-│ đăng nhập│  │ customer_id│
+│ Solution │  │ Solution  │
+│    1     │  │    2      │
+│ ⭐ NỀN   │  │ (bổ sung)  │
+│          │  │           │
+│ Co-buy + │  │ S1 +      │
+│ category │  │ size_rank │
+│          │  │           │
+│ Mọi SP   │  │ Chỉ cho Tã│
 └──────────┘  └────────────┘
 ```
