@@ -26,8 +26,8 @@ export interface RecommendationResponse {
   item_id: string;
   recommendations: (Product & {
     co_count?: number;
-    size_gap?: number;
-    score_upsale?: number;
+    behavior_score?: number;
+    upsale_score?: number;
     final_score?: number;
   })[];
   strategy: string;
@@ -35,6 +35,9 @@ export interface RecommendationResponse {
 
 export interface RelatedProductsResponse {
   item_id: string;
-  related: (Product & { co_count?: number })[];
+  related: (Product & {
+    co_count?: number;
+    behavior_score?: number;
+  })[];
   strategy: string;
 }

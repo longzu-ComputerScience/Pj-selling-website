@@ -114,10 +114,21 @@ def get_solution1_candidates(
     # --- Bước 4: Lọc theo danh mục tương tự ---
     filtered, category_strategy = _filter_by_similar_category(candidates, product)
 
-    # --- Bước 5: Sắp xếp theo co_count giảm dần ---
+    # --- Bước 5: Normalize co_count → behavior_score (0–1) ---
+    max_count = filtered["co_count"].max()
+    if max_count is not None and max_count > 0:
+        filtered = filtered.with_columns(
+            (pl.col("co_count").cast(pl.Float64) / float(max_count)).alias("behavior_score")
+        )
+    else:
+        filtered = filtered.with_columns(
+            pl.lit(0.0).alias("behavior_score")
+        )
+
+    # --- Bước 6: Sắp xếp theo behavior_score giảm dần ---
     return (
         product,
-        filtered.sort("co_count", descending=True),
+        filtered.sort("behavior_score", descending=True),
         f"solution1:co_buy+{category_strategy}",
     )
 

@@ -6,7 +6,7 @@ import {
 } from "./types";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 async function fetchAPI<T>(path: string): Promise<T> {
   const controller = new AbortController();
@@ -29,7 +29,9 @@ async function fetchAPI<T>(path: string): Promise<T> {
     }
     if (err instanceof TypeError) {
       throw new Error(
-        "Cannot connect to the backend. Make sure it is running on port 8000."
+        "Cannot reach the backend at " +
+          API_BASE +
+          ". Make sure it is running and CORS is configured correctly."
       );
     }
     throw err;

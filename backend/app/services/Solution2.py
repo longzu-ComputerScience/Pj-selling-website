@@ -7,15 +7,16 @@ Thuật toán:
     2. **Lấy tập ứng viên nền từ Solution 1** (co-buy + lọc category).
     3. **Kiểm tra điều kiện áp dụng**:
          - Nếu sản phẩm KHÔNG thuộc danh mục "Tã" → trả nguyên Solution 1.
-         - Nếu sản phẩm không có size_rank → trả nguyên Solution 1.
+         - Nếu sản phẩm không có normalized_size → trả nguyên Solution 1.
     4. **Chấm điểm upsale cho sản phẩm tã** (chỉ áp dụng khi là Tã):
          a. Lọc ứng viên: chỉ giữ ứng viên thuộc danh mục Tã,
-            có size_rank, và size_rank >= size_rank hiện tại.
-         b. Tính size_gap = candidate_size_rank − current_size_rank.
-         c. score_upsale = size_gap + 1
-            (size_gap = 0 → cùng size → score = 1;
-             size_gap lớn → size lớn hơn → ưu tiên cao hơn).
-         d. final_score = co_count × score_upsale.
+            có normalized_size.
+         b. Tính upsale_score dựa trên chênh lệch size:
+            - Cùng size → 1.0
+            - Lớn hơn → giảm nhẹ: max(0.5, 1 - diff * 0.1)
+            - Nhỏ hơn → phạt mạnh: max(0.1, 1 - abs(diff) * 0.3)
+            - Không xác định → 0.5
+         c. final_score = behavior_score × upsale_score.
     5. **Xếp hạng**: sắp xếp theo final_score giảm dần, rồi co_count
        giảm dần (tie-breaker).
     6. **Fallback**: nếu sau lọc không còn ứng viên tã hợp lệ → trả
@@ -34,6 +35,47 @@ from . import Solution1
 # Hằng số danh mục Tã (category_l1)
 DIAPER_CATEGORY = "T\u00e3"
 
+# Thứ tự size chuẩn từ nhỏ → lớn
+SIZE_ORDER = ["NB", "S", "M", "L", "XL", "XXL", "XXXL"]
+
+
+# ---------------------------------------------------------------------------
+# Bước phụ: Tính upsale_score theo chênh lệch size
+# ---------------------------------------------------------------------------
+
+def _get_upsale_score(base_size: str, target_size: str) -> float:
+    """
+    Tính điểm upsale dựa trên chênh lệch size.
+
+    Quy tắc:
+        - Cùng size (diff=0) → 1.0
+        - Target lớn hơn (diff>0) → giảm nhẹ: max(0.5, 1 - diff * 0.1)
+        - Target nhỏ hơn (diff<0) → phạt mạnh: max(0.1, 1 - abs(diff) * 0.3)
+        - Size không xác định → 0.5
+
+    Args:
+        base_size:   Size của sản phẩm đang xem (normalized_size).
+        target_size: Size của ứng viên (normalized_size).
+
+    Returns:
+        Điểm upsale (float từ 0.1 đến 1.0).
+    """
+    if base_size not in SIZE_ORDER or target_size not in SIZE_ORDER:
+        return 0.5
+
+    base_idx = SIZE_ORDER.index(base_size)
+    target_idx = SIZE_ORDER.index(target_size)
+    diff = target_idx - base_idx
+
+    if diff == 0:
+        return 1.0
+    elif diff > 0:
+        # Lớn hơn → giảm nhẹ
+        return max(0.5, 1 - diff * 0.1)
+    else:
+        # Nhỏ hơn → phạt mạnh
+        return max(0.1, 1 - abs(diff) * 0.3)
+
 
 # ---------------------------------------------------------------------------
 # Bước phụ: Tạo response fallback từ kết quả Solution 1
@@ -50,7 +92,7 @@ def _build_solution1_fallback_response(
     Xây dựng response recommendation từ tập ứng viên Solution 1.
 
     Hàm này được dùng khi KHÔNG thể áp dụng logic upsale của Solution 2
-    (ví dụ: sản phẩm không phải Tã, không có size_rank, hoặc không tìm
+    (ví dụ: sản phẩm không phải Tã, không có normalized_size, hoặc không tìm
     được ứng viên tã phù hợp).
 
     Args:
@@ -80,11 +122,14 @@ def _build_solution1_fallback_response(
 
     # --- Lấy top-N và join đầy đủ thông tin từ catalog ---
     store = get_data_store()
-    top_recommendations = (
-        candidates
-        .head(n)
-        .select("item_id", "co_count")
-    )
+
+    # Chọn các cột cần thiết (bao gồm behavior_score nếu có)
+    select_cols = ["item_id", "co_count"]
+    if "behavior_score" in candidates.columns:
+        select_cols.append("behavior_score")
+
+    top_recommendations = candidates.head(n).select(select_cols)
+
     result = (
         top_recommendations
         .join(store.products, on="item_id", how="inner")
@@ -104,63 +149,78 @@ def _build_solution1_fallback_response(
 
 def _score_diaper_upsale_candidates(
     base_candidates: pl.DataFrame,
-    current_size_rank: int,
+    base_size: str,
     store: object,
 ) -> pl.DataFrame:
     """
     Chấm điểm upsale cho các ứng viên tã dựa trên chênh lệch size.
 
-    Logic chấm điểm:
-        1. Lọc: chỉ giữ ứng viên thuộc danh mục Tã, có size_rank,
-           và size_rank >= current_size_rank (không gợi ý size nhỏ hơn).
-        2. size_gap = candidate_size_rank − current_size_rank.
-        3. score_upsale = size_gap + 1
-           → cùng size (gap=0) có score=1, size lớn hơn có score cao hơn.
-        4. final_score = co_count × score_upsale
-           → kết hợp tần suất mua chung với mức ưu tiên upsale.
+    Logic chấm điểm (theo notebook):
+        1. Lọc: chỉ giữ ứng viên thuộc danh mục Tã, có normalized_size.
+        2. Tính upsale_score dựa trên get_score():
+           → cùng size → 1.0
+           → lớn hơn → max(0.5, 1 - diff * 0.1)
+           → nhỏ hơn → max(0.1, 1 - abs(diff) * 0.3)
+        3. final_score = behavior_score × upsale_score
 
     Args:
-        base_candidates:   Tập ứng viên từ Solution 1.
-        current_size_rank: size_rank của sản phẩm đang xem.
+        base_candidates:   Tập ứng viên từ Solution 1 (có behavior_score).
+        base_size:         normalized_size của sản phẩm đang xem.
         store:             DataStore singleton.
 
     Returns:
         DataFrame ứng viên đã chấm điểm (có thể rỗng).
     """
-    # --- Join metadata size_rank và category_l1 cho từng ứng viên ---
+    # --- Chọn cột cần thiết từ base_candidates ---
+    select_cols = ["item_id", "co_count"]
+    if "behavior_score" in base_candidates.columns:
+        select_cols.append("behavior_score")
+
+    # --- Join metadata size và category_l1 cho từng ứng viên ---
     candidates = (
         base_candidates
-        .select("item_id", "co_count")
+        .select(select_cols)
         .join(
-            store.products.select("item_id", "category_l1", "size_rank"),
+            store.products.select("item_id", "category_l1", "normalized_size"),
             on="item_id",
             how="inner",
         )
     )
 
-    # --- Lọc, tính điểm ---
-    scored = (
+    # --- Lọc: chỉ giữ ứng viên thuộc danh mục Tã, có normalized_size ---
+    filtered = (
         candidates
-        # Chỉ giữ ứng viên thuộc danh mục Tã
         .filter(pl.col("category_l1") == DIAPER_CATEGORY)
-        # Chỉ giữ ứng viên có thông tin size
-        .filter(pl.col("size_rank").is_not_null())
-        # Chỉ giữ ứng viên có size >= size hiện tại (upsale, không downsale)
-        .filter(pl.col("size_rank") >= int(current_size_rank))
-        # Tính size_gap: chênh lệch bậc size
-        .with_columns(
-            (pl.col("size_rank") - int(current_size_rank)).alias("size_gap")
+        .filter(pl.col("normalized_size").is_not_null())
+        .filter(pl.col("normalized_size") != "")
+    )
+
+    if filtered.height == 0:
+        return filtered
+
+    # --- Tính upsale_score bằng map_elements ---
+    scored = filtered.with_columns(
+        pl.col("normalized_size")
+        .map_elements(
+            lambda target_size: _get_upsale_score(base_size, target_size),
+            return_dtype=pl.Float64,
         )
-        # Tính score_upsale = size_gap + 1
-        .with_columns(
-            (pl.col("size_gap") + 1).cast(pl.Float64).alias("score_upsale")
-        )
-        # Tính final_score = co_count × score_upsale
-        .with_columns(
-            (pl.col("co_count").cast(pl.Float64) * pl.col("score_upsale")).alias(
-                "final_score"
+        .alias("upsale_score")
+    )
+
+    # --- Đảm bảo có behavior_score ---
+    if "behavior_score" not in scored.columns:
+        max_count = scored["co_count"].max()
+        if max_count is not None and max_count > 0:
+            scored = scored.with_columns(
+                (pl.col("co_count").cast(pl.Float64) / float(max_count)).alias("behavior_score")
             )
-        )
+        else:
+            scored = scored.with_columns(pl.lit(0.0).alias("behavior_score"))
+
+    # --- Tính final_score = behavior_score × upsale_score ---
+    scored = scored.with_columns(
+        (pl.col("behavior_score") * pl.col("upsale_score")).alias("final_score")
     )
 
     return scored
@@ -179,8 +239,8 @@ def get_recommendations(item_id: str, n: int = 20) -> dict:
     Luồng xử lý:
         1. Gọi Solution 1 để lấy tập ứng viên nền.
         2. Nếu sản phẩm không phải Tã → trả nguyên Solution 1 (fallback).
-        3. Nếu là Tã nhưng không có size_rank → trả nguyên Solution 1.
-        4. Nếu là Tã và có size_rank → chấm điểm upsale, xếp hạng.
+        3. Nếu là Tã nhưng không có normalized_size → trả nguyên Solution 1.
+        4. Nếu là Tã và có normalized_size → chấm điểm upsale, xếp hạng.
         5. Nếu sau chấm điểm không còn ứng viên → fallback Solution 1.
 
     Args:
@@ -191,7 +251,7 @@ def get_recommendations(item_id: str, n: int = 20) -> dict:
         Dict gồm:
             - ``item_id``: mã sản phẩm gốc.
             - ``recommendations``: danh sách sản phẩm gợi ý
-              (kèm co_count, size_gap, score_upsale, final_score).
+              (kèm co_count, upsale_score, behavior_score, final_score).
             - ``strategy``: chuỗi mô tả chiến lược đã dùng.
     """
     store = get_data_store()
@@ -215,9 +275,9 @@ def get_recommendations(item_id: str, n: int = 20) -> dict:
             item_id, base_candidates, base_strategy, n
         )
 
-    # --- Bước 3: Là Tã nhưng không có size_rank → fallback Solution 1 ---
-    current_size_rank = product.get("size_rank")
-    if current_size_rank is None:
+    # --- Bước 3: Là Tã nhưng không có normalized_size → fallback ---
+    base_size = product.get("normalized_size")
+    if not base_size:
         return _build_solution1_fallback_response(
             item_id,
             base_candidates,
@@ -228,7 +288,7 @@ def get_recommendations(item_id: str, n: int = 20) -> dict:
 
     # --- Bước 4: Chấm điểm upsale cho ứng viên tã ---
     scored = _score_diaper_upsale_candidates(
-        base_candidates, current_size_rank, store
+        base_candidates, base_size, store
     )
 
     # --- Bước 5: Fallback nếu không còn ứng viên sau lọc ---
@@ -249,7 +309,7 @@ def get_recommendations(item_id: str, n: int = 20) -> dict:
             descending=[True, True],
         )
         .head(n)
-        .select("item_id", "co_count", "size_gap", "score_upsale", "final_score")
+        .select("item_id", "co_count", "behavior_score", "upsale_score", "final_score")
     )
 
     # --- Join đầy đủ thông tin catalog ---
