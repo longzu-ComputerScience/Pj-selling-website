@@ -41,3 +41,18 @@ export interface RelatedProductsResponse {
   })[];
   strategy: string;
 }
+
+export interface ForecastPrediction {
+  location: number;
+  item_id: string;
+  quantity_predict: number;
+  actual_quantity: number;
+  avg_price: number;
+}
+
+export interface ForecastResponse {
+  strategy: string;
+  mae: number;
+  total_predictions: number;
+  predictions: ForecastPrediction[];
+}

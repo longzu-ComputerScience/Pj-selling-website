@@ -3,14 +3,15 @@ import {
   ProductListResponse,
   RecommendationResponse,
   RelatedProductsResponse,
+  ForecastResponse,
 } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
-async function fetchAPI<T>(path: string): Promise<T> {
+async function fetchAPI<T>(path: string, timeoutMs = 10000): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -83,4 +84,9 @@ export async function getRelatedProducts(
 
 export async function getCategories(): Promise<string[]> {
   return fetchAPI<string[]>("/categories");
+}
+
+export async function getForecast(): Promise<ForecastResponse> {
+  // Forecast training can be slow on first call — use 120s timeout
+  return fetchAPI<ForecastResponse>("/forecast/solution3", 120000);
 }

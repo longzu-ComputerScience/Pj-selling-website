@@ -1,7 +1,7 @@
 """Khai bao API route cho PJ-SELLING-WEBSITE."""
 
 from fastapi import APIRouter, Query, HTTPException
-from ..services import Solution1, Solution2, product_service
+from ..services import Solution1, Solution2, Solution3, product_service
 
 router = APIRouter()
 
@@ -10,6 +10,12 @@ router = APIRouter()
 def health_check():
     """API kiem tra trang thai."""
     return {"status": "ok"}
+
+
+@router.get("/forecast/solution3")
+def get_forecast():
+    """Lay ket qua du bao san luong theo Solution 3 (LightGBM)."""
+    return Solution3.get_forecast()
 
 
 @router.get("/products")
