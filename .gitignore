@@ -17,6 +17,7 @@ env/
 
 # Generated data artifacts (reproducible via preprocess.py)
 data/
+raw_data/
 
 # OS files
 .DS_Store
@@ -34,3 +35,10 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+.gitnexus
+
+Predict Solution
+
+User Guide
+
+

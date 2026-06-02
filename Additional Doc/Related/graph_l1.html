@@ -1,0 +1,358 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script>function neighbourhoodHighlight(params) {
+  // console.log("in nieghbourhoodhighlight");
+  allNodes = nodes.get({ returnType: "Object" });
+  // originalNodes = JSON.parse(JSON.stringify(allNodes));
+  // if something is selected:
+  if (params.nodes.length > 0) {
+    highlightActive = true;
+    var i, j;
+    var selectedNode = params.nodes[0];
+    var degrees = 2;
+
+    // mark all nodes as hard to read.
+    for (let nodeId in allNodes) {
+      // nodeColors[nodeId] = allNodes[nodeId].color;
+      allNodes[nodeId].color = "rgba(200,200,200,0.5)";
+      if (allNodes[nodeId].hiddenLabel === undefined) {
+        allNodes[nodeId].hiddenLabel = allNodes[nodeId].label;
+        allNodes[nodeId].label = undefined;
+      }
+    }
+    var connectedNodes = network.getConnectedNodes(selectedNode);
+    var allConnectedNodes = [];
+
+    // get the second degree nodes
+    for (i = 1; i < degrees; i++) {
+      for (j = 0; j < connectedNodes.length; j++) {
+        allConnectedNodes = allConnectedNodes.concat(
+          network.getConnectedNodes(connectedNodes[j])
+        );
+      }
+    }
+
+    // all second degree nodes get a different color and their label back
+    for (i = 0; i < allConnectedNodes.length; i++) {
+      // allNodes[allConnectedNodes[i]].color = "pink";
+      allNodes[allConnectedNodes[i]].color = "rgba(150,150,150,0.75)";
+      if (allNodes[allConnectedNodes[i]].hiddenLabel !== undefined) {
+        allNodes[allConnectedNodes[i]].label =
+          allNodes[allConnectedNodes[i]].hiddenLabel;
+        allNodes[allConnectedNodes[i]].hiddenLabel = undefined;
+      }
+    }
+
+    // all first degree nodes get their own color and their label back
+    for (i = 0; i < connectedNodes.length; i++) {
+      // allNodes[connectedNodes[i]].color = undefined;
+      allNodes[connectedNodes[i]].color = nodeColors[connectedNodes[i]];
+      if (allNodes[connectedNodes[i]].hiddenLabel !== undefined) {
+        allNodes[connectedNodes[i]].label =
+          allNodes[connectedNodes[i]].hiddenLabel;
+        allNodes[connectedNodes[i]].hiddenLabel = undefined;
+      }
+    }
+
+    // the main node gets its own color and its label back.
+    // allNodes[selectedNode].color = undefined;
+    allNodes[selectedNode].color = nodeColors[selectedNode];
+    if (allNodes[selectedNode].hiddenLabel !== undefined) {
+      allNodes[selectedNode].label = allNodes[selectedNode].hiddenLabel;
+      allNodes[selectedNode].hiddenLabel = undefined;
+    }
+  } else if (highlightActive === true) {
+    // console.log("highlightActive was true");
+    // reset all nodes
+    for (let nodeId in allNodes) {
+      // allNodes[nodeId].color = "purple";
+      allNodes[nodeId].color = nodeColors[nodeId];
+      // delete allNodes[nodeId].color;
+      if (allNodes[nodeId].hiddenLabel !== undefined) {
+        allNodes[nodeId].label = allNodes[nodeId].hiddenLabel;
+        allNodes[nodeId].hiddenLabel = undefined;
+      }
+    }
+    highlightActive = false;
+  }
+
+  // transform the object into an array
+  var updateArray = [];
+  if (params.nodes.length > 0) {
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        // console.log(allNodes[nodeId]);
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  } else {
+    // console.log("Nothing was selected");
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        // console.log(allNodes[nodeId]);
+        // allNodes[nodeId].color = {};
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  }
+}
+
+function filterHighlight(params) {
+  allNodes = nodes.get({ returnType: "Object" });
+  // if something is selected:
+  if (params.nodes.length > 0) {
+    filterActive = true;
+    let selectedNodes = params.nodes;
+
+    // hiding all nodes and saving the label
+    for (let nodeId in allNodes) {
+      allNodes[nodeId].hidden = true;
+      if (allNodes[nodeId].savedLabel === undefined) {
+        allNodes[nodeId].savedLabel = allNodes[nodeId].label;
+        allNodes[nodeId].label = undefined;
+      }
+    }
+
+    for (let i=0; i < selectedNodes.length; i++) {
+      allNodes[selectedNodes[i]].hidden = false;
+      if (allNodes[selectedNodes[i]].savedLabel !== undefined) {
+        allNodes[selectedNodes[i]].label = allNodes[selectedNodes[i]].savedLabel;
+        allNodes[selectedNodes[i]].savedLabel = undefined;
+      }
+    }
+
+  } else if (filterActive === true) {
+    // reset all nodes
+    for (let nodeId in allNodes) {
+      allNodes[nodeId].hidden = false;
+      if (allNodes[nodeId].savedLabel !== undefined) {
+        allNodes[nodeId].label = allNodes[nodeId].savedLabel;
+        allNodes[nodeId].savedLabel = undefined;
+      }
+    }
+    filterActive = false;
+  }
+
+  // transform the object into an array
+  var updateArray = [];
+  if (params.nodes.length > 0) {
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  } else {
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  }
+}
+
+function selectNode(nodes) {
+  network.selectNodes(nodes);
+  neighbourhoodHighlight({ nodes: nodes });
+  return nodes;
+}
+
+function selectNodes(nodes) {
+  network.selectNodes(nodes);
+  filterHighlight({nodes: nodes});
+  return nodes;
+}
+
+function highlightFilter(filter) {
+  let selectedNodes = []
+  let selectedProp = filter['property']
+  if (filter['item'] === 'node') {
+    let allNodes = nodes.get({ returnType: "Object" });
+    for (let nodeId in allNodes) {
+      if (allNodes[nodeId][selectedProp] && filter['value'].includes((allNodes[nodeId][selectedProp]).toString())) {
+        selectedNodes.push(nodeId)
+      }
+    }
+  }
+  else if (filter['item'] === 'edge'){
+    let allEdges = edges.get({returnType: 'object'});
+    // check if the selected property exists for selected edge and select the nodes connected to the edge
+    for (let edge in allEdges) {
+      if (allEdges[edge][selectedProp] && filter['value'].includes((allEdges[edge][selectedProp]).toString())) {
+        selectedNodes.push(allEdges[edge]['from'])
+        selectedNodes.push(allEdges[edge]['to'])
+      }
+    }
+  }
+  selectNodes(selectedNodes)
+}</script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+            
+            
+            
+            
+            
+
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 750px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 178, 192, 0.85)", "font": {"color": "#333333"}, "id": "Babycare", "label": "Babycare", "shape": "dot", "size": 44.16666666666667, "title": "\ud83d\udce6 Babycare\nS\u1ed1 c\u1ea1nh: 10\nT\u1ed5ng score: 48.5621"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 207, 236, 0.85)", "font": {"color": "#333333"}, "id": "G\u00f3i H\u1ed9i Vi\u00ean", "label": "G\u00f3i H\u1ed9i Vi\u00ean", "shape": "dot", "size": 23.75, "title": "\ud83d\udce6 G\u00f3i H\u1ed9i Vi\u00ean\nS\u1ed1 c\u1ea1nh: 3\nT\u1ed5ng score: 10.5778"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 182, 198, 0.85)", "font": {"color": "#333333"}, "id": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "label": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "shape": "dot", "size": 41.25, "title": "\ud83d\udce6 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9\nS\u1ed1 c\u1ea1nh: 9\nT\u1ed5ng score: 42.1006"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 203, 230, 0.85)", "font": {"color": "#333333"}, "id": "H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh", "label": "H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh", "shape": "dot", "size": 26.666666666666664, "title": "\ud83d\udce6 H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh\nS\u1ed1 c\u1ea1nh: 4\nT\u1ed5ng score: 12.0511"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 203, 230, 0.85)", "font": {"color": "#333333"}, "id": "Ph\u1ee5 ki\u1ec7n", "label": "Ph\u1ee5 ki\u1ec7n", "shape": "dot", "size": 26.666666666666664, "title": "\ud83d\udce6 Ph\u1ee5 ki\u1ec7n\nS\u1ed1 c\u1ea1nh: 4\nT\u1ed5ng score: 14.4333"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 207, 236, 0.85)", "font": {"color": "#333333"}, "id": "S\u1eefa n\u01b0\u1edbc", "label": "S\u1eefa n\u01b0\u1edbc", "shape": "dot", "size": 23.75, "title": "\ud83d\udce6 S\u1eefa n\u01b0\u1edbc\nS\u1ed1 c\u1ea1nh: 3\nT\u1ed5ng score: 15.3876"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 207, 236, 0.85)", "font": {"color": "#333333"}, "id": "TPCN", "label": "TPCN", "shape": "dot", "size": 23.75, "title": "\ud83d\udce6 TPCN\nS\u1ed1 c\u1ea1nh: 3\nT\u1ed5ng score: 14.7882"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 203, 230, 0.85)", "font": {"color": "#333333"}, "id": "Textile", "label": "Textile", "shape": "dot", "size": 26.666666666666664, "title": "\ud83d\udce6 Textile\nS\u1ed1 c\u1ea1nh: 4\nT\u1ed5ng score: 18.2842"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 199, 223, 0.85)", "font": {"color": "#333333"}, "id": "Th\u1eddi trang", "label": "Th\u1eddi trang", "shape": "dot", "size": 29.583333333333336, "title": "\ud83d\udce6 Th\u1eddi trang\nS\u1ed1 c\u1ea1nh: 5\nT\u1ed5ng score: 19.2593"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 170, 180, 0.85)", "font": {"color": "#333333"}, "id": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "label": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "shape": "dot", "size": 50.0, "title": "\ud83d\udce6 Th\u1ef1c ph\u1ea9m cho b\u00e9\nS\u1ed1 c\u1ea1nh: 12\nT\u1ed5ng score: 73.3224"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 207, 236, 0.85)", "font": {"color": "#333333"}, "id": "Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh", "label": "Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh", "shape": "dot", "size": 23.75, "title": "\ud83d\udce6 Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh\nS\u1ed1 c\u1ea1nh: 3\nT\u1ed5ng score: 13.5471"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 190, 211, 0.85)", "font": {"color": "#333333"}, "id": "V\u1ec7 sinh", "label": "V\u1ec7 sinh", "shape": "dot", "size": 35.41666666666667, "title": "\ud83d\udce6 V\u1ec7 sinh\nS\u1ed1 c\u1ea1nh: 7\nT\u1ed5ng score: 26.3264"}, {"borderWidth": 2, "borderWidthSelected": 3, "color": "rgba(100, 207, 236, 0.85)", "font": {"color": "#333333"}, "id": "\u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch", "label": "\u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch", "shape": "dot", "size": 23.75, "title": "\ud83d\udce6 \u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch\nS\u1ed1 c\u1ea1nh: 3\nT\u1ed5ng score: 13.2282"}, {"borderWidth": 1, "borderWidthSelected": 2, "color": "rgba(200, 200, 200, 0.6)", "font": {"color": "#333333"}, "id": "S\u1eefa", "label": "S\u1eefa", "shape": "dot", "size": 20, "title": "\ud83d\udce6 S\u1eefa\n(Node c\u00f4 l\u1eadp \u2014 \u0111\u00e3 lo\u1ea1i c\u1ea1nh)"}, {"borderWidth": 1, "borderWidthSelected": 2, "color": "rgba(200, 200, 200, 0.6)", "font": {"color": "#333333"}, "id": "T\u00e3", "label": "T\u00e3", "shape": "dot", "size": 20, "title": "\ud83d\udce6 T\u00e3\n(Node c\u00f4 l\u1eadp \u2014 \u0111\u00e3 lo\u1ea1i c\u1ea1nh)"}]);
+                  edges = new vis.DataSet([{"color": "rgba(30, 80, 160, 0.8999999999999999)", "from": "S\u1eefa n\u01b0\u1edbc", "title": "\ud83d\udd17 S\u1eefa n\u01b0\u1edbc \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 151,333\ncount(A)   = 269,678\ncount(B)   = 728,904\nP(B|A)     = 0.5612\nP(A|B)     = 0.2076\nScore      = 9.1694", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 15.0, "width": 15.0}, {"color": "rgba(46, 96, 169, 0.81647169933404)", "from": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 Th\u1ef1c ph\u1ea9m cho b\u00e9 \u2194 Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 86,170\ncount(A)   = 728,904\ncount(B)   = 143,136\nP(B|A)     = 0.1182\nP(A|B)     = 0.6020\nScore      = 8.1848", "to": "Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh", "value": 13.051006317794265, "width": 13.051006317794265}, {"color": "rgba(49, 99, 171, 0.800612196541056)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 162,906\ncount(A)   = 367,783\ncount(B)   = 728,904\nP(B|A)     = 0.4429\nP(A|B)     = 0.2235\nScore      = 7.9978", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 12.680951252624638, "width": 12.680951252624638}, {"color": "rgba(52, 102, 172, 0.789575362640865)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 123,090\ncount(A)   = 365,698\ncount(B)   = 367,783\nP(B|A)     = 0.3366\nP(A|B)     = 0.3347\nScore      = 7.8677", "to": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "value": 12.42342512828685, "width": 12.42342512828685}, {"color": "rgba(57, 107, 176, 0.7616583135473602)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 153,717\ncount(A)   = 365,698\ncount(B)   = 728,904\nP(B|A)     = 0.4203\nP(A|B)     = 0.2109\nScore      = 7.5387", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 11.772027316105072, "width": 11.772027316105072}, {"color": "rgba(72, 122, 184, 0.6867126475445313)", "from": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 Th\u1ef1c ph\u1ea9m cho b\u00e9 \u2194 \u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 68,231\ncount(A)   = 728,904\ncount(B)   = 135,296\nP(B|A)     = 0.0936\nP(A|B)     = 0.5043\nScore      = 6.6552", "to": "\u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch", "value": 10.023295109372398, "width": 10.023295109372398}, {"color": "rgba(73, 123, 185, 0.6841352352336536)", "from": "TPCN", "title": "\ud83d\udd17 TPCN \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 81,542\ncount(A)   = 172,052\ncount(B)   = 728,904\nP(B|A)     = 0.4739\nP(A|B)     = 0.1119\nScore      = 6.6248", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 9.963155488785251, "width": 9.963155488785251}, {"color": "rgba(77, 127, 187, 0.6643801355406287)", "from": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 Th\u1ef1c ph\u1ea9m cho b\u00e9 \u2194 V\u1ec7 sinh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 100,288\ncount(A)   = 728,904\ncount(B)   = 240,227\nP(B|A)     = 0.1376\nP(A|B)     = 0.4175\nScore      = 6.3920", "to": "V\u1ec7 sinh", "value": 9.502203162614672, "width": 9.502203162614672}, {"color": "rgba(86, 136, 193, 0.6164421235840116)", "from": "Ph\u1ee5 ki\u1ec7n", "title": "\ud83d\udd17 Ph\u1ee5 ki\u1ec7n \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 34,185\ncount(A)   = 66,865\ncount(B)   = 728,904\nP(B|A)     = 0.5113\nP(A|B)     = 0.0469\nScore      = 5.8269", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 8.383649550293606, "width": 8.383649550293606}, {"color": "rgba(91, 141, 196, 0.5906741018921366)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 Textile\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 32,686\ncount(A)   = 365,698\ncount(B)   = 73,957\nP(B|A)     = 0.0894\nP(A|B)     = 0.4420\nScore      = 5.5231", "to": "Textile", "value": 7.782395710816522, "width": 7.782395710816522}, {"color": "rgba(95, 145, 198, 0.573231303794997)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 V\u1ec7 sinh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 69,179\ncount(A)   = 365,698\ncount(B)   = 240,227\nP(B|A)     = 0.1892\nP(A|B)     = 0.2880\nScore      = 5.3175", "to": "V\u1ec7 sinh", "value": 7.375397088549929, "width": 7.375397088549929}, {"color": "rgba(98, 148, 199, 0.5598160687805649)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 V\u1ec7 sinh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 67,428\ncount(A)   = 367,783\ncount(B)   = 240,227\nP(B|A)     = 0.1833\nP(A|B)     = 0.2807\nScore      = 5.1594", "to": "V\u1ec7 sinh", "value": 7.06237493821318, "width": 7.06237493821318}, {"color": "rgba(107, 157, 205, 0.512560619074718)", "from": "Textile", "title": "\ud83d\udd17 Textile \u2194 Th\u1eddi trang\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 18,629\ncount(A)   = 73,957\ncount(B)   = 86,172\nP(B|A)     = 0.2519\nP(A|B)     = 0.2162\nScore      = 4.6023", "to": "Th\u1eddi trang", "value": 5.959747778410086, "width": 5.959747778410086}, {"color": "rgba(108, 158, 205, 0.5070330156978959)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 Textile\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 27,346\ncount(A)   = 367,783\ncount(B)   = 73,957\nP(B|A)     = 0.0744\nP(A|B)     = 0.3698\nScore      = 4.5372", "to": "Textile", "value": 5.830770366284238, "width": 5.830770366284238}, {"color": "rgba(109, 159, 206, 0.5018750688269611)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 \u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 41,568\ncount(A)   = 365,698\ncount(B)   = 135,296\nP(B|A)     = 0.1137\nP(A|B)     = 0.3072\nScore      = 4.4764", "to": "\u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch", "value": 5.7104182726290915, "width": 5.7104182726290915}, {"color": "rgba(110, 160, 207, 0.49560087461975394)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 Th\u1eddi trang\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 29,801\ncount(A)   = 365,698\ncount(B)   = 86,172\nP(B|A)     = 0.0815\nP(A|B)     = 0.3458\nScore      = 4.4024", "to": "Th\u1eddi trang", "value": 5.564020407794259, "width": 5.564020407794259}, {"color": "rgba(113, 163, 208, 0.4823656970433382)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 TPCN\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 46,330\ncount(A)   = 367,783\ncount(B)   = 172,052\nP(B|A)     = 0.1260\nP(A|B)     = 0.2693\nScore      = 4.2464", "to": "TPCN", "value": 5.255199597677892, "width": 5.255199597677892}, {"color": "rgba(115, 165, 209, 0.472472750486145)", "from": "Th\u1eddi trang", "title": "\ud83d\udd17 Th\u1eddi trang \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 30,793\ncount(A)   = 86,172\ncount(B)   = 728,904\nP(B|A)     = 0.3573\nP(A|B)     = 0.0422\nScore      = 4.1298", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 5.02436417801005, "width": 5.02436417801005}, {"color": "rgba(117, 167, 210, 0.46296550921260227)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 G\u00f3i H\u1ed9i Vi\u00ean\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 7,788\ncount(A)   = 365,698\ncount(B)   = 18,235\nP(B|A)     = 0.0213\nP(A|B)     = 0.4271\nScore      = 4.0177", "to": "G\u00f3i H\u1ed9i Vi\u00ean", "value": 4.8025285482940525, "width": 4.8025285482940525}, {"color": "rgba(119, 169, 211, 0.454425816927409)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 TPCN\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 42,961\ncount(A)   = 365,698\ncount(B)   = 172,052\nP(B|A)     = 0.1175\nP(A|B)     = 0.2497\nScore      = 3.9170", "to": "TPCN", "value": 4.603269061639545, "width": 4.603269061639545}, {"color": "rgba(121, 171, 213, 0.4424443077649621)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 5,536\ncount(A)   = 12,860\ncount(B)   = 728,904\nP(B|A)     = 0.4305\nP(A|B)     = 0.0076\nScore      = 3.7758", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 4.323700514515782, "width": 4.323700514515782}, {"color": "rgba(124, 174, 214, 0.4293611284612511)", "from": "Textile", "title": "\ud83d\udd17 Textile \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 24,100\ncount(A)   = 73,957\ncount(B)   = 728,904\nP(B|A)     = 0.3259\nP(A|B)     = 0.0331\nScore      = 3.6216", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 4.018426330762525, "width": 4.018426330762525}, {"color": "rgba(126, 176, 216, 0.41977507938616865)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 5,106\ncount(A)   = 367,783\ncount(B)   = 12,860\nP(B|A)     = 0.0139\nP(A|B)     = 0.3970\nScore      = 3.5086", "to": "H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh", "value": 3.794751852343935, "width": 3.794751852343935}, {"color": "rgba(127, 177, 217, 0.4110501408830518)", "from": "G\u00f3i H\u1ed9i Vi\u00ean", "title": "\ud83d\udd17 G\u00f3i H\u1ed9i Vi\u00ean \u2194 Th\u1ef1c ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 6,859\ncount(A)   = 18,235\ncount(B)   = 728,904\nP(B|A)     = 0.3761\nP(A|B)     = 0.0094\nScore      = 3.4057", "to": "Th\u1ef1c ph\u1ea9m cho b\u00e9", "value": 3.591169953937875, "width": 3.591169953937875}, {"color": "rgba(129, 179, 218, 0.40231528338408895)", "from": "Ph\u1ee5 ki\u1ec7n", "title": "\ud83d\udd17 Ph\u1ee5 ki\u1ec7n \u2194 Th\u1eddi trang\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 13,115\ncount(A)   = 66,865\ncount(B)   = 86,172\nP(B|A)     = 0.1961\nP(A|B)     = 0.1522\nScore      = 3.3028", "to": "Th\u1eddi trang", "value": 3.3873566122954086, "width": 3.3873566122954086}, {"color": "rgba(130, 180, 218, 0.3959351491191579)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 S\u1eefa n\u01b0\u1edbc\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 46,707\ncount(A)   = 367,783\ncount(B)   = 269,678\nP(B|A)     = 0.1270\nP(A|B)     = 0.1732\nScore      = 3.2276", "to": "S\u1eefa n\u01b0\u1edbc", "value": 3.2384868127803514, "width": 3.2384868127803514}, {"color": "rgba(132, 182, 219, 0.38972521911763625)", "from": "G\u00f3i H\u1ed9i Vi\u00ean", "title": "\ud83d\udd17 G\u00f3i H\u1ed9i Vi\u00ean \u2194 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 6,268\ncount(A)   = 18,235\ncount(B)   = 367,783\nP(B|A)     = 0.3437\nP(A|B)     = 0.0170\nScore      = 3.1544", "to": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "value": 3.0935884460781797, "width": 3.0935884460781797}, {"color": "rgba(134, 184, 221, 0.37583862610385554)", "from": "S\u1eefa n\u01b0\u1edbc", "title": "\ud83d\udd17 S\u1eefa n\u01b0\u1edbc \u2194 Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 27,370\ncount(A)   = 269,678\ncount(B)   = 143,136\nP(B|A)     = 0.1015\nP(A|B)     = 0.1912\nScore      = 2.9907", "to": "Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh", "value": 2.7695679424232966, "width": 2.7695679424232966}, {"color": "rgba(136, 186, 222, 0.3683218648849326)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 Ph\u1ee5 ki\u1ec7n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 16,856\ncount(A)   = 365,698\ncount(B)   = 66,865\nP(B|A)     = 0.0461\nP(A|B)     = 0.2521\nScore      = 2.9021", "to": "Ph\u1ee5 ki\u1ec7n", "value": 2.5941768473150955, "width": 2.5941768473150955}, {"color": "rgba(137, 187, 222, 0.3615368291997649)", "from": "Th\u1eddi trang", "title": "\ud83d\udd17 Th\u1eddi trang \u2194 V\u1ec7 sinh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 18,242\ncount(A)   = 86,172\ncount(B)   = 240,227\nP(B|A)     = 0.2117\nP(A|B)     = 0.0759\nScore      = 2.8221", "to": "V\u1ec7 sinh", "value": 2.435859347994514, "width": 2.435859347994514}, {"color": "rgba(141, 191, 225, 0.34265870665405085)", "from": "Babycare", "title": "\ud83d\udd17 Babycare \u2194 H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 3,905\ncount(A)   = 365,698\ncount(B)   = 12,860\nP(B|A)     = 0.0107\nP(A|B)     = 0.3037\nScore      = 2.5995", "to": "H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh", "value": 1.9953698219278535, "width": 1.9953698219278535}, {"color": "rgba(144, 194, 226, 0.3258715492081791)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m cho b\u00e9 \u2194 Ph\u1ee5 ki\u1ec7n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 14,211\ncount(A)   = 367,783\ncount(B)   = 66,865\nP(B|A)     = 0.0386\nP(A|B)     = 0.2125\nScore      = 2.4017", "to": "Ph\u1ee5 ki\u1ec7n", "value": 1.6036694815241805, "width": 1.6036694815241805}, {"color": "rgba(145, 195, 227, 0.32332916446311644)", "from": "Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh", "title": "\ud83d\udd17 Th\u1ef1c ph\u1ea9m cho gia \u0111\u00ecnh \u2194 V\u1ec7 sinh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 21,340\ncount(A)   = 143,136\ncount(B)   = 240,227\nP(B|A)     = 0.1491\nP(A|B)     = 0.0888\nScore      = 2.3717", "to": "V\u1ec7 sinh", "value": 1.5443471708060508, "width": 1.5443471708060508}, {"color": "rgba(148, 198, 229, 0.30597874331968045)", "from": "H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh", "title": "\ud83d\udd17 H\u00f3a m\u1ef9 ph\u1ea9m gia \u0111\u00ecnh \u2194 V\u1ec7 sinh\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 3,269\ncount(A)   = 12,860\ncount(B)   = 240,227\nP(B|A)     = 0.2542\nP(A|B)     = 0.0136\nScore      = 2.1672", "to": "V\u1ec7 sinh", "value": 1.1395040107925443, "width": 1.1395040107925443}, {"color": "rgba(150, 200, 230, 0.3)", "from": "V\u1ec7 sinh", "title": "\ud83d\udd17 V\u1ec7 sinh \u2194 \u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncount(A,B) = 18,472\ncount(A)   = 240,227\ncount(B)   = 135,296\nP(B|A)     = 0.0769\nP(A|B)     = 0.1365\nScore      = 2.0967", "to": "\u0110\u1ed3 ch\u01a1i \u0026 S\u00e1ch", "value": 1.0, "width": 1.0}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "forceAtlas2Based": {
+            "avoidOverlap": 0.5,
+            "centralGravity": 0.01,
+            "damping": 0.4,
+            "gravitationalConstant": -80,
+            "springConstant": 0.05,
+            "springLength": 200
+        },
+        "solver": "forceAtlas2Based",
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

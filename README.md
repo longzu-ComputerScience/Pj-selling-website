@@ -1,9 +1,9 @@
 # PJ-SELLING-WEBSITE
 
-A full-stack e-commerce demo project showcasing two smart features:
+A full-stack e-commerce demo project showcasing two item-based features:
 
-1. **Product Recommendation** — personalised product suggestions for customers
-2. **Related Products Display** — similar and complementary products on product detail pages
+1. **Solution 1 (Related Products)** — co-buy + similar category (L3/L2 fallback)
+2. **Solution 2 (Recommended Products)** — diaper up-sale using co-buy * score_upsale
 
 ---
 
@@ -21,12 +21,11 @@ A full-stack e-commerce demo project showcasing two smart features:
 
 ```
 PJ-SELLING-WEBSITE/
-├── items.parquet                      # Raw product catalog (29,808 items)
-├── transactions-2025-12.parquet       # Raw transaction history (3.7M rows)
+├── raw_data/
+│   ├── items.parquet                  # Raw product catalog (29,808 items)
+│   └── transactions-2025-12.parquet   # Raw transaction history (3.7M rows)
 ├── data/                              # Generated artifacts (from preprocessing)
-│   ├── products.parquet
-│   ├── item_popularity.parquet
-│   ├── customer_history.parquet
+│   ├── products.parquet               # Product catalog + diaper size metadata
 │   └── item_cooccurrence.parquet
 ├── scripts/
 │   └── preprocess.py                  # Data preprocessing script
@@ -39,16 +38,16 @@ PJ-SELLING-WEBSITE/
 │       └── services/
 │           ├── data_loader.py         # Loads artifacts into memory
 │           ├── product_service.py     # Product listing & search
-│           ├── recommendation_service.py
-│           └── related_products_service.py
+│           ├── Solution1.py           # Related products
+│           └── Solution2.py           # Recommendation extends Solution1 for diapers
 ├── frontend/
 │   ├── package.json
 │   ├── tailwind.config.ts
 │   ├── app/
 │   │   ├── layout.tsx
 │   │   ├── page.tsx                   # Home (product listing)
-│   │   ├── products/[id]/page.tsx     # Product detail + related products
-│   │   └── recommendations/page.tsx   # Recommendation page
+│   │   ├── products/[id]/page.tsx     # Product detail (Solution 1 + Solution 2)
+│   │   └── recommendations/page.tsx   # Solution 2 demo page (item-based)
 │   ├── components/
 │   │   ├── Header.tsx
 │   │   ├── ProductCard.tsx
@@ -114,8 +113,8 @@ Frontend runs at **http://localhost:3000**.
 | GET    | `/api/products/{item_id}`         | Get single product                         |
 | GET    | `/api/categories`                 | List all top-level categories              |
 | GET    | `/api/brands`                     | List all brands                            |
-| GET    | `/api/recommendations/{customer_id}` | Personalised recommendations           |
-| GET    | `/api/related/{item_id}`          | Related products for an item               |
+| GET    | `/api/related/{item_id}`          | Solution 1 related products for an item |
+| GET    | `/api/recommendations/{item_id}`  | Solution 2 recommendations for an item |
 
 ### Example Requests
 
@@ -129,75 +128,70 @@ curl http://localhost:8000/api/products?category=Babycare
 # Get a product
 curl http://localhost:8000/api/products/0020020000253
 
-# Recommendations for customer 7853616
-curl http://localhost:8000/api/recommendations/7853616
-
-# Related products for item 0020020000253
+# Solution 1 related products for item 0020020000253
 curl http://localhost:8000/api/related/0020020000253
+
+# Solution 2 recommendations for item 0020010000098
+curl http://localhost:8000/api/recommendations/0020010000098
 ```
 
 ---
 
-## How Recommendation Works
+## Solution 1 — Related Products
 
-### Algorithm: Co-occurrence Collaborative Filtering
+Solution 1 follows the notebook-style rule set:
 
-1. **Look up** the customer's purchase history (items they have bought).
-2. For each purchased item, **query the co-occurrence table** to find items
-   frequently bought together with it by other customers.
-3. **Aggregate** co-occurrence scores across all purchased items.
-4. **Remove** items the customer already owns.
-5. **Rank** by total score and return the top N results.
+1. Start from **co-buy** candidates for product `X` (items with co-occurrence
+   count against `X`).
+2. Apply **similar category** filtering:
+   - prefer same `category_l3`
+   - fallback to same `category_l2` when no `category_l3` matches exist
+3. Rank by `co_count` descending.
 
-### Cold-Start Handling
+No brand scoring and no weighted metadata hybrid are used in Solution 1.
+If both `category_l3` and `category_l2` produce no matches, the service keeps
+the co-buy set (`strategy = "co_buy_only"`) instead of falling back to
+`category_l1`.
 
-If the customer has no purchase history (or no co-occurrence data exists for
-their purchases), the system falls back to **globally popular products** ranked
-by total purchase count.
-
-### Response Format
-
-The API response includes a `strategy` field:
-- `"personalized"` — co-occurrence-based recommendations
-- `"popular"` — popularity fallback
+The endpoint is:
+- `GET /api/related/{item_id}`
 
 ---
 
-## How Related Products Works
+## Solution 2 — Recommended Products
 
-### Algorithm: Behavioral + Metadata Hybrid
+Solution 2 is item-based and used for diaper up-sale on product detail pages.
 
-Related products combine two signals:
-
-#### 1. Behavioral Signal (weight = 0.6)
-
-Uses the co-occurrence table to find items frequently co-purchased with the
-target item. Scores are normalised to [0, 1] by dividing by the max
-co-occurrence count for that item.
-
-This captures **complementary products** — e.g. baby formula → bottles.
-
-#### 2. Metadata Similarity (weight = 0.4)
-
-Computes a similarity score from the product catalog:
-
-| Match                  | Score |
-| ---------------------- | ----- |
-| Same `category_l1`    | 0.25  |
-| Same `category_l2`    | +0.25 |
-| Same `category_l3`    | +0.25 |
-| Same `brand`          | +0.25 |
-
-This captures **similar products** within the same category hierarchy.
-
-#### Final Score
+1. Start from the **Solution 1 candidate set** for product `X`.
+2. This means every product first goes through:
+   - co-buy lookup
+   - `category_l3` filtering when possible
+   - `category_l2` fallback otherwise
+3. If `X` is diaper (`category_l1 == "Tã"`):
+   - keep diaper candidates only
+   - keep candidates with `size_rank >= current_size_rank`
+   - compute:
 
 ```
-relation_score = 0.6 × behavioral_score + 0.4 × metadata_score
+size_gap = candidate_size_rank - current_size_rank
+score_upsale = size_gap + 1
+final_score = co_count * score_upsale
 ```
 
-When no behavioral data exists for an item, only metadata similarity is used
-(strategy = `"metadata_only"`).
+4. Rank by `final_score` descending, then `co_count` descending.
+
+Fallback behavior:
+- If `X` is not diaper, Solution 2 returns the Solution 1 result as-is
+  (`strategy = "solution1_only:..."`).
+- If diaper size metadata is missing, Solution 2 also falls back to
+  Solution 1 (`strategy = "solution1_only:size_unknown+..."`).
+- If no diaper candidate survives the size filter, Solution 2 again falls back
+  to Solution 1 (`strategy = "solution1_only:no_diaper_candidate+..."`).
+- If no `category_l3` and `category_l2` matches are found, Solution 2 keeps
+  the co-buy set before diaper/size filters (`strategy` includes `co_buy_only`).
+
+The endpoint is:
+- `GET /api/recommendations/{item_id}`
 
 ---
 
@@ -215,9 +209,17 @@ When no behavioral data exists for an item, only metadata similarity is used
 | category       | string  | Detailed category name          |
 | brand          | string  | Product brand                   |
 | manufacturer   | string  | Product manufacturer            |
+| description    | string  | Free-text product description   |
 | sale_status    | int     | 0 = normal, 1 = on sale         |
+| size           | string  | Raw size text in source data    |
 
 29,808 products. Vietnamese baby/children's products.
+
+Derived fields added in `data/products.parquet` during preprocessing:
+- `raw_size`
+- `normalized_size` (`NB`, `S`, `M`, `L`, `XL`, `XXL`, `XXXL`)
+- `size_rank` (0..6)
+- `is_diaper`
 
 ### transactions-2025-12.parquet — Transaction History
 
